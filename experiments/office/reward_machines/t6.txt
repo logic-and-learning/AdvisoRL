@@ -1,0 +1,12 @@
+0 # initial state
+(0,0,'!b',ConstantRewardFunction(0))
+(0,1,'b',ConstantRewardFunction(0))
+(1,1,'!d',ConstantRewardFunction(0))
+(1,2,'d',ConstantRewardFunction(0))
+(2,2,'!b',ConstantRewardFunction(0))
+(2,3,'b',ConstantRewardFunction(0))
+(3,3,'!d',ConstantRewardFunction(0))
+(3,4,'d',ConstantRewardFunction(0))
+(4,4,'!e',ConstantRewardFunction(0))
+(4,5,'e',ConstantRewardFunction(1))
+(5,5,'True',ConstantRewardFunction(0))

@@ -1,6 +1,7 @@
 from testerHRL.tester_craft import TesterCraftWorld
 from testerHRL.tester_office import TesterOfficeWorld
 from testerHRL.tester_traffic import TesterTrafficWorld
+from testerHRL.tester_taxi import TesterTaxiWorld
 from reward_machines.reward_machine import RewardMachine
 from testerHRL.test_utils import read_json, get_precentiles_str, get_precentiles_in_seconds, reward2steps
 import numpy as np
@@ -26,6 +27,8 @@ class TesterHRL:
                 self.world = TesterCraftWorld(experiment, learning_params.tabular_case, learning_params.gamma)
             if self.game_type == "trafficworld":
                 self.world = TesterTrafficWorld(experiment, learning_params.tabular_case, learning_params.gamma)
+            if self.game_type == "taxiworld":
+                self.world = TesterTaxiWorld(experiment, learning_params.gamma)
 
             # Creating the reward machines for each task
             self.reward_machines = []
@@ -54,9 +57,11 @@ class TesterHRL:
                 self.world = TesterWaterWorld(None, None, data['world'])
             if self.game_type == "officeworld":
                 self.world = TesterOfficeWorld(None, None, data['world'])
+            if self.game_type == "taxiworld":
+                self.world = TesterTaxiWorld(None, None, data['world']) # TODO is that correct?
 
             self.results = data['results']
-            self.steps   = data['steps']            
+            self.steps   = data['steps']
             # obs: json transform the interger keys from 'results' into strings
             # so I'm changing the 'steps' to strings
             for i in range(len(self.steps)):
@@ -80,7 +85,7 @@ class TesterHRL:
 
     def get_world_dictionary(self):
         return self.world.get_dictionary()
-    
+
     def get_task_specifications(self):
         # Returns the list with the task specifications (reward machine + env params)
         return self.world.get_task_specifications()
@@ -114,7 +119,7 @@ class TesterHRL:
                 id_step = [i for i in range(len(self.steps)) if self.steps[i] == step][0] - 1
                 reward = 0 if id_step < 0 else self.results[task_str][self.steps[id_step]][-1]
                 #print("Skiped reward is", reward)
-            self.results[task_str][step].append(reward) 
+            self.results[task_str][step].append(reward)
             aux.append(reward)
         print("Testing: %0.1f"%(time.time() - t_init), "seconds\tTotal: %d"%sum([(r if r > 0 else self.testing_params.num_steps) for r in reward2steps(aux)]))
         print("\t".join(["%d"%(r) for r in reward2steps(aux)]))
@@ -122,14 +127,14 @@ class TesterHRL:
 
     def show_results(self):
         average_reward = {}
-        
+
         tasks = self.get_task_specifications()
 
         # Showing perfomance per task
         for t in tasks:
             t_str = str(t)
             print("\n" + t_str + " --------------------")
-            print("steps\tP25\t\tP50\t\tP75")            
+            print("steps\tP25\t\tP50\t\tP75")
             for s in self.steps:
                 normalized_rewards = [r/self.get_optimal(t) for r in self.results[t_str][s]]
                 a = np.array(normalized_rewards)
@@ -146,7 +151,7 @@ class TesterHRL:
 
         # Showing average perfomance across all the task
         print("\nAverage Reward --------------------")
-        print("steps\tP25\t\tP50\t\tP75")            
+        print("steps\tP25\t\tP50\t\tP75")
         num_tasks = float(len(tasks))
         for s in self.steps:
             normalized_rewards = average_reward[s] / num_tasks
@@ -167,10 +172,10 @@ class TesterHRL:
         ax.grid()
         ax.set(xlabel='number of steps', ylabel='reward')
 
-        plt.fill_between(steps,p25,p50,color='grey',alpha='0.25')
-        plt.fill_between(steps,p50,p75,color='grey',alpha='0.25')
+        plt.fill_between(steps,p25,p50,color='grey',alpha=0.25)
+        plt.fill_between(steps,p50,p75,color='grey',alpha=0.25)
 
-        plt.show()    
+        plt.show()
 
     def plot_this(self,a1,a2):
         fig, ax = plt.subplots()
@@ -185,7 +190,7 @@ class TesterHRL:
         ret = {}
         for t in self.get_task_specifications():
             t_str = str(t)
-            ret[t_str] = max([max(self.results[t_str][s]) for s in self.steps]) 
+            ret[t_str] = max([max(self.results[t_str][s]) for s in self.steps])
         return ret
 
     def get_result_summary(self):
@@ -228,6 +233,5 @@ class TesterHRL:
                 normalized_task_rewards = task_reward[task_rm][s] / float(task_reward_count[task_rm])
                 ret_task[task_rm].append([s, normalized_task_rewards])
         ret_task["all"] = ret
-                
-        return ret_task
 
+        return ret_task

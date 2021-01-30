@@ -59,7 +59,7 @@ def run_hrl_baseline(sess, q, rm_file, meta_controllers, options, policy_bank, t
     # Getting the initial state of the environment and the reward machine
     s1, s1_features = task.get_state_and_features()
     u1 = rm.get_initial_state()
-    
+
     while t < learning_params.max_timesteps_per_task and not curriculum_stop:
         # selecting a macro action from the meta controller
         mc_s1, mc_s1_features, mc_u1 = s1, s1_features, u1
@@ -115,14 +115,14 @@ def run_hrl_baseline(sess, q, rm_file, meta_controllers, options, policy_bank, t
         current_step += 1
 
             # Choosing an action to perform
-        if random.random() < 0.15: 
+        if random.random() < 0.15:
             a = random.choice(actions)
-        else: 
+        else:
             a = policy_bank.get_best_action(mc_option[0], mc_option[1], s1_features.reshape((1,num_features)))
 
             # updating the curriculum
         curriculum.add_step()
-            
+
             # Executing the action
         if tester.game_type=="trafficworld":
             events = task.get_true_propositions_action(a)
@@ -212,7 +212,7 @@ def run_hrl_baseline(sess, q, rm_file, meta_controllers, options, policy_bank, t
         s1, s1_features, u1 = s2, s2_features, u2
 
         t += 1
-        if t == learning_params.max_timesteps_per_task or curriculum_stop or mc_done: 
+        if t == learning_params.max_timesteps_per_task or curriculum_stop or mc_done:
             break
 
 
@@ -308,7 +308,7 @@ def run_hrl_baseline_test(sess, q, reward_machines, task_params, rm_id, learning
 
         # Choosing an action to perform
         a = policy_bank.get_best_action(mc_option[0], mc_option[1], s1_features.reshape((1,num_features)))
-            
+
             # Executing the action
         task.execute_action(a)
         a = task.get_last_action() # due to MDP slip
@@ -356,7 +356,11 @@ def run_hrl_experiments(alg_name, tester, curriculum, num_times, show_print, use
     steps = list()
     rewards = list()
     plot_dict = dict()
-    for t in range(num_times):
+    if isinstance(num_times, int):
+        num_times = range(num_times)
+    elif isinstance(num_times, tuple):
+        num_times = range(*num_times)
+    for t_i,t in enumerate(num_times):
         tt=t+1
         # Setting the random seed to 't'
         random.seed(t)
@@ -373,8 +377,8 @@ def run_hrl_experiments(alg_name, tester, curriculum, num_times, show_print, use
         curriculum.restart()
 
         # Creating the experience replay buffer
-        replay_buffer, beta_schedule = create_experience_replay_buffer(learning_params.buffer_size, learning_params.prioritized_replay, learning_params.prioritized_replay_alpha, learning_params.prioritized_replay_beta0, curriculum.total_steps if learning_params.prioritized_replay_beta_iters is None else learning_params.prioritized_replay_beta_iters)      
-        
+        replay_buffer, beta_schedule = create_experience_replay_buffer(learning_params.buffer_size, learning_params.prioritized_replay, learning_params.prioritized_replay_alpha, learning_params.prioritized_replay_beta0, curriculum.total_steps if learning_params.prioritized_replay_beta_iters is None else learning_params.prioritized_replay_beta_iters)
+
         # Loading options for this experiment
         option_folder = "../experiments/%s/options/"%tester.get_world_name()
 
@@ -521,7 +525,7 @@ def run_hrl_experiments(alg_name, tester, curriculum, num_times, show_print, use
         for item in rewards_plot:
             f.write("%s\n" % item)
 
-            
+
     # Showing results
     tester.show_results()
     print("Time:", "%0.2f"%((time.time() - time_init)/60), "mins")

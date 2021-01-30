@@ -150,7 +150,7 @@ class OfficeWorld:
                 print()                
 
     # The following methods create the map ----------------------------------------------
-    def _load_map(self):
+    def _load_map_old(self):
         # Creating the map
         self.objects = {}
         #env.agent = tuple([2, 2])
@@ -203,6 +203,43 @@ class OfficeWorld:
         # Adding the agent
         self.agent = (2,1)
         self.actions = [Actions.up.value,Actions.right.value,Actions.down.value,Actions.left.value]
+    def _load_map(self):
+        # Creating the map
+        self.objects = {}
+        self.objects[(1,1)] = "a"
+        self.objects[(10,1)] = "b"
+        #self.objects[(10,7)] = "c"
+        self.objects[(1, 3)] = "c"
+        self.objects[(1,7)] = "d"
+        self.objects[(7,4)] = "e"  # MAIL
+        self.objects[(3,5)] = "f"  # COFFEE
+        self.objects[(4,4)] = "g"  # OFFICE
+
+        # Adding the agent
+        self.agent = (2,1)
+        self.actions = [Actions.up.value,Actions.right.value,Actions.down.value,Actions.left.value]
+
+        # Adding walls
+        self.forbidden_transitions = set()
+        for x in range(12):
+            for y in [0,3,6]:
+                self.forbidden_transitions.add((x,y,Actions.down))
+                self.forbidden_transitions.add((x,y+2,Actions.up))
+        for y in range(9):
+            for x in [0,3,6,9]:
+                self.forbidden_transitions.add((x,y,Actions.left))
+                self.forbidden_transitions.add((x+2,y,Actions.right))
+        # adding 'doors'
+        for y in [1,7]:
+            for x in [2,5,8]:
+                self.forbidden_transitions.remove((x,y,Actions.right))
+                self.forbidden_transitions.remove((x+1,y,Actions.left))
+        for x in [1,4,7,10]:
+            self.forbidden_transitions.remove((x,5,Actions.up))
+            self.forbidden_transitions.remove((x,6,Actions.down))
+        for x in [1,10]:
+            self.forbidden_transitions.remove((x,2,Actions.up))
+            self.forbidden_transitions.remove((x,3,Actions.down))
         
 def play():
     from reward_machines.reward_machine import RewardMachine

@@ -7,21 +7,22 @@ from baselines.feature_proxy_hrl import FeatureProxy
 
 class MetaController:
     def __init__(self, sess, policy_name, options, option2file, rm, use_rm, learning_params, num_features, num_states, show_print, epsilon=0.1):
-        
+
         self.show_print = show_print
         self.options = options
         self.option2file = option2file
         self.epsilon = epsilon
         self.gamma = learning_params.gamma
-        self.rm = rm 
+        self.rm = rm
         self.use_rm = use_rm
         self.tabular_case = learning_params.tabular_case
 
         # This proxy adds the machine state representation to the MDP state
         self.feature_proxy = FeatureProxy(num_features, num_states, self.tabular_case)
         self.num_actions  = len(options)
-        self.num_features = self.feature_proxy.get_num_features()        
-        
+        # self.num_features = self.feature_proxy.get_num_features()
+        self.num_features = num_features
+
         # network parameters
         num_hidden_layers = 2                 # this has no effect on the tabular case
         num_neurons = 64                      # this has no effect on the tabular case
@@ -30,9 +31,9 @@ class MetaController:
             lr = 0.7
             buffer_size = 1
             self.batch_size = 1
-            self.learning_starts = 0 
+            self.learning_starts = 0
         else:
-            lr = 1e-3 
+            lr = 1e-3
             buffer_size = 50000
             self.batch_size =  32
             self.learning_starts = 100
@@ -49,7 +50,7 @@ class MetaController:
         for u in self.rm.get_states():
             a_mask = np.ones(self.num_actions, dtype=np.float)
             if use_rm and not self.rm.is_terminal_state(u):
-                a_mask = np.zeros(self.num_actions, dtype=np.float)                
+                a_mask = np.zeros(self.num_actions, dtype=np.float)
                 # Options that would move the RM to another state is useful
                 useful_options = self.rm.get_useful_transitions(u)
                 # looking for an exact match
@@ -58,7 +59,7 @@ class MetaController:
                         a_mask[i] = 1
                 # if no exact match is found, we relax this condition and use any option that might be useful
                 if np.sum(a_mask) < 1:
-                    a_mask = np.zeros(self.num_actions, dtype=np.float)                
+                    a_mask = np.zeros(self.num_actions, dtype=np.float)
                     for i in range(self.num_actions):
                         if _is_match(option2file[i].split("&"), useful_options, False):
                             a_mask[i] = 1
@@ -89,7 +90,7 @@ class MetaController:
             s1, a, r, s2, s2_mask, done, gamma = self.er_buffer.sample(self.batch_size)
             self.neuralnet.learn(s1, a, r, s2, s2_mask, done, gamma)
             self.step += 1
-        
+
             # Updating the target network
             if self.step%self.target_network_update_freq == 0:
                 if self.show_print: print("MC: Update network", self.step)
@@ -105,7 +106,7 @@ class MetaController:
         return self.get_best_action(s, u)
 
     def get_best_action(self, s, u):
-        s = self.feature_proxy.add_state_features(s, u).reshape((1,108)) #changed self.num_features to 108
+        s = self.feature_proxy.add_state_features(s, u).reshape((1,self.num_features))
         action_id = self.neuralnet.get_best_action(s, self._get_mask(u))
         return int(action_id)
 
@@ -132,11 +133,11 @@ class MCNet:
         self.policy_name = policy_name
 
         # Inputs to the network
-        self.s1 = tf.placeholder(tf.float64, [None, 108]) #changed num_features to 108, here and self.s2
+        self.s1 = tf.placeholder(tf.float64, [None, num_features])
         self.s1_mask = tf.placeholder(tf.float64, [None, num_actions])
         self.a = tf.placeholder(tf.int32)
         self.r = tf.placeholder(tf.float64)
-        self.s2 = tf.placeholder(tf.float64, [None, 108])
+        self.s2 = tf.placeholder(tf.float64, [None, num_features])
         self.s2_mask = tf.placeholder(tf.float64, [None, num_actions])
         self.done  = tf.placeholder(tf.float64)
         self.gamma = tf.placeholder(tf.float64) # gamma depends on the number of executed steps
@@ -146,9 +147,9 @@ class MCNet:
             # Defining regular and target neural nets
             if self.tabular_case:
                 with tf.variable_scope("q_network") as scope:
-                    q_values, _ = create_linear_regression(self.s1, 108, num_actions)
+                    q_values, _ = create_linear_regression(self.s1, num_features, num_actions)
                     scope.reuse_variables()
-                    q_target, _ = create_linear_regression(self.s2, 108, num_actions)
+                    q_target, _ = create_linear_regression(self.s2, num_features, num_actions)
             else:
                 with tf.variable_scope("q_network") as scope:
                     q_values, q_values_weights = create_net(self.s1, num_features, num_actions, num_neurons, num_hidden_layers)
@@ -167,7 +168,7 @@ class MCNet:
             q_current = tf.reduce_sum(tf.multiply(q_values, action_mask), 1)
             q_max = tf.reduce_max(q_target - 10000000*(1.0-self.s2_mask), axis=1) # I remove invalid actions by adding a big negative contants to them
             q_max = q_max * (1.0-self.done) # dead ends must have q_max equal to zero
-            q_target_value = self.r + tf.multiply(self.gamma, q_max) 
+            q_target_value = self.r + tf.multiply(self.gamma, q_max)
             q_target_value = tf.stop_gradient(q_target_value)
 
             loss = 0.5 * tf.reduce_sum(tf.square(q_current - q_target_value))
@@ -189,14 +190,14 @@ class MCNet:
         self.sess.run(self.train, {self.s1: s1, self.a: a, self.r: r, self.s2: s2, self.s2_mask: s2_mask, self.done: done, self.gamma: gamma})
 
     def get_best_action(self, s1, s1_mask):
-        s1      = s1.reshape((1,108)) #self.num_features to 108
+        s1      = s1.reshape((1,self.num_features))
         s1_mask = s1_mask.reshape((1,self.num_actions))
         return self.sess.run(self.best_action, {self.s1: s1, self.s1_mask: s1_mask})
 
     def update_target_network(self):
         if not self.tabular_case:
             self.sess.run(self.update_target)
-        
+
 
 
 class MCReplayBuffer(object):
@@ -235,7 +236,3 @@ class MCReplayBuffer(object):
     def sample(self, batch_size):
         idxes = [random.randint(0, len(self._storage) - 1) for _ in range(batch_size)]
         return self._encode_sample(idxes)
-
-
-
-

@@ -2,6 +2,7 @@ import numpy as np
 
 class FeatureProxy:
     def __init__(self, num_features, num_states, is_tabular):
+        print(num_features,num_states)
         self.num_features = num_features
         self.num_states   = num_states
         self.is_tabular = is_tabular

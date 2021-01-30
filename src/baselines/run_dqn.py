@@ -10,7 +10,7 @@ from reward_machines.reward_machine import RewardMachine
 
 def run_dqn_baseline(sess, rm_file, policy_bank, tester, curriculum, show_print, previous_test):
     """
-    This code runs one training episode. 
+    This code runs one training episode.
         - rm_file: It is the path towards the RM machine to solve on this episode
     """
     # Initializing parameters and the game
@@ -59,7 +59,7 @@ def run_dqn_baseline(sess, rm_file, policy_bank, tester, curriculum, show_print,
         # updating the curriculum
         curriculum.add_step()
         policy_bank.add_step(rm_id)
-        
+
         # Executing the action
         task.execute_action(a)
         s2, s2_features = task.get_state_and_features()
@@ -138,7 +138,7 @@ def run_dqn_baseline(sess, rm_file, policy_bank, tester, curriculum, show_print,
 
             if curriculum.stop_task(t):
                 break
-        
+
         # checking the steps time-out
         if curriculum.stop_learning():
             break
@@ -279,7 +279,11 @@ def run_dqn_experiments(alg_name, tester, curriculum, num_times, show_print):
     rewards = list()
     plot_dict = dict()
 
-    for t in range(num_times):
+    if isinstance(num_times, int):
+        num_times = range(num_times)
+    elif isinstance(num_times, tuple):
+        num_times = range(*num_times)
+    for t_i,t in enumerate(num_times):
         # Setting the random seed to 't'
         random.seed(t)
         sess = tf.Session()
@@ -315,7 +319,7 @@ def run_dqn_experiments(alg_name, tester, curriculum, num_times, show_print):
 
         tf.reset_default_graph()
         sess.close()
-        
+
         # Backing up the results
         saver.save_results()
 
@@ -382,4 +386,3 @@ def run_dqn_experiments(alg_name, tester, curriculum, num_times, show_print):
     # Showing results
     tester.show_results()
     print("Time:", "%0.2f"%((time.time() - time_init)/60), "mins")
-

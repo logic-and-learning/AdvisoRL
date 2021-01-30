@@ -74,20 +74,23 @@ def get_params_craft_world(experiment):
 
 
 def get_params_office_world(experiment):
-    step_unit = 1000
+    # step_unit = 1000
+    step_unit = 3000
 
     # configuration of testing params
     testing_params = TestingParameters()
     testing_params.test = True
     testing_params.test_freq =  step_unit
     testing_params.num_steps = step_unit  # I'm giving one minute to the agent to solve the task
+    # testing_params.num_steps = step_unit*2  # I'm giving one minute to the agent to solve the task
 
     # configuration of learning params
     learning_params = LearningParameters()
     learning_params.memory_size = 200
     learning_params.buffer_size = 10
     learning_params.relearn_period = 30
-    learning_params.enter_loop = 10
+    # learning_params.enter_loop = 10
+    learning_params.enter_loop = 1
     learning_params.lr = 1e-4  # 5e-5 seems to be better than 1e-4
     learning_params.gamma = 0.9
     learning_params.max_timesteps_per_task = testing_params.num_steps
@@ -98,7 +101,7 @@ def get_params_office_world(experiment):
     learning_params.learning_starts = 10
 
     # Tabular case
-    learning_params.tabular_case = False  
+    learning_params.tabular_case = False
     learning_params.use_random_maps = False
     learning_params.use_double_dqn = True
     learning_params.prioritized_replay = True
@@ -111,7 +114,9 @@ def get_params_office_world(experiment):
     # Setting the curriculum learner
     curriculum = CurriculumLearner(tester.get_task_rms())
     curriculum.num_steps = testing_params.num_steps
-    curriculum.total_steps = 400 * step_unit
+    # curriculum.total_steps = 400 * step_unit
+    # curriculum.total_steps = 800 * step_unit
+    curriculum.total_steps = 200 * step_unit
     curriculum.min_steps = 1
 
     print("Water World ----------")
@@ -194,7 +199,69 @@ def get_params_traffic_world(experiment):
     return testing_params, learning_params, tester, curriculum
 
 
-def run_experiment(world, alg_name, experiment_known, experiment_learned, num_times, show_print, show_plots, is_SAT):
+
+def get_params_taxi_world(experiment):
+    # step_unit = 1000
+    step_unit = 3000
+
+    # configuration of testing params
+    testing_params = TestingParameters()
+    testing_params.test = True
+    testing_params.test_freq =  step_unit
+    testing_params.num_steps = step_unit  # I'm giving one minute to the agent to solve the task
+    # testing_params.num_steps = step_unit*2  # I'm giving one minute to the agent to solve the task
+
+    # configuration of learning params
+    learning_params = LearningParameters()
+    learning_params.memory_size = 200
+    learning_params.buffer_size = 10
+    learning_params.relearn_period = 30
+    # learning_params.enter_loop = 10
+    learning_params.enter_loop = 1
+    learning_params.lr = 1e-4  # 5e-5 seems to be better than 1e-4
+    learning_params.gamma = 0.9
+    learning_params.max_timesteps_per_task = testing_params.num_steps
+    learning_params.print_freq = step_unit
+    learning_params.train_freq = 1
+    learning_params.batch_size = 1
+    learning_params.target_network_update_freq = 100  # obs: 500 makes learning more stable, but slower
+    learning_params.learning_starts = 10
+
+    # Tabular case
+    learning_params.tabular_case = False
+    learning_params.use_random_maps = False
+    learning_params.use_double_dqn = True
+    learning_params.prioritized_replay = True
+    learning_params.num_hidden_layers = 6
+    learning_params.num_neurons = 64
+
+    # Setting the experiment
+    tester = Tester(learning_params, testing_params, experiment)
+
+    # Setting the curriculum learner
+    curriculum = CurriculumLearner(tester.get_task_rms())
+    curriculum.num_steps = testing_params.num_steps
+    # curriculum.total_steps = 400 * step_unit
+    # curriculum.total_steps = 800 * step_unit
+    curriculum.total_steps = 200 * step_unit
+    curriculum.min_steps = 1
+
+    print("Taxi World ----------")
+    print("lr:", learning_params.lr)
+    print("batch_size:", learning_params.batch_size)
+    print("num_hidden_layers:", learning_params.num_hidden_layers)
+    print("target_network_update_freq:", learning_params.target_network_update_freq)
+    print("TRAIN gamma:", learning_params.gamma)
+    print("Total steps:", curriculum.total_steps)
+    print("tabular_case:", learning_params.tabular_case)
+    print("use_double_dqn:", learning_params.use_double_dqn)
+    print("prioritized_replay:", learning_params.prioritized_replay)
+    print("use_random_maps:", learning_params.use_random_maps)
+
+    return testing_params, learning_params, tester, curriculum
+
+
+def run_experiment(world, alg_name, experiment_known, experiment_learned, num_times, show_print, show_plots, al_alg_name, sat_alg_name, pysat_hints=None):
     if world == 'officeworld':
         testing_params_k, learning_params_k, tester, curriculum_k = get_params_office_world(experiment_known)
         testing_params, learning_params, tester_l, curriculum = get_params_office_world(experiment_learned)
@@ -208,6 +275,9 @@ def run_experiment(world, alg_name, experiment_known, experiment_learned, num_ti
     if world == 'waterworld':
         testing_params_k, learning_params_k, tester, curriculum_k = get_params_water_world(experiment_known)
         testing_params, learning_params, tester_l, curriculum = get_params_water_world(experiment_learned)
+    if world == 'taxiworld':
+        testing_params_k, learning_params_k, tester, curriculum_k = get_params_taxi_world(experiment_known)
+        testing_params, learning_params, tester_l, curriculum = get_params_taxi_world(experiment_learned)
 
     if alg_name == "ddqn":
         tester = TesterPolicyBank(learning_params, testing_params, experiment_known)
@@ -240,7 +310,8 @@ if __name__ == "__main__":
 
     # Getting params
     algorithms     = ["hrl", "jirp", "qlearning", "ddqn"]
-    worlds     = ["office", "craft", "traffic"]
+    al_algorithms  = ["RPNI", "SAT", "PYSAT"]
+    worlds         = ["office", "craft", "traffic", "taxi"]
     from automata_learning_utils.pysat import sat_algorithms
 
     parser = argparse.ArgumentParser(prog="run_experiments", description='Runs a multi-task RL experiment over a particular environment.')
@@ -300,12 +371,20 @@ if __name__ == "__main__":
         if alg_name == "hrl":
             experiment_l = "../experiments/craft/tests/ground_truth.txt"
             experiment_t = "../experiments/craft/tests/ground_truth.txt"
-    else:
+    elif world == "traffic":
         experiment_l = "../experiments/traffic/tests/hypothesis_machines.txt"
         experiment_t = "../experiments/traffic/tests/ground_truth.txt"
         if alg_name == "hrl":
             experiment_l = "../experiments/traffic/tests/ground_truth.txt"
             experiment_t = "../experiments/traffic/tests/ground_truth.txt"
+    elif world == "taxi":
+        experiment_l = "../experiments/taxi/tests/hypothesis_machines.txt"
+        experiment_t = "../experiments/taxi/tests/ground_truth.txt"
+        if alg_name == "hrl":
+            experiment_l = "../experiments/taxi/tests/ground_truth.txt"
+            experiment_t = "../experiments/taxi/tests/ground_truth.txt"
+    else:
+        raise NotImplementedError("world={:r}".format(world))
     world += "world"
 
 

@@ -1,6 +1,7 @@
 from tester.tester_craft import TesterCraftWorld
 from tester.tester_office import TesterOfficeWorld
 from tester.tester_traffic import TesterTrafficWorld
+from tester.tester_taxi import TesterTaxiWorld
 from reward_machines.reward_machine import RewardMachine
 from tester.test_utils import read_json, get_precentiles_str, get_precentiles_in_seconds, reward2steps
 import numpy as np
@@ -27,6 +28,8 @@ class Tester:
                 self.world = TesterCraftWorld(experiment, learning_params.tabular_case, learning_params.gamma)
             if self.game_type == "trafficworld":
                 self.world = TesterTrafficWorld(experiment, learning_params.tabular_case, learning_params.gamma)
+            if self.game_type == "taxiworld":
+                self.world = TesterTaxiWorld(experiment, learning_params.gamma)
 
             # Creating the reward machines for each task
             self.reward_machines = []
@@ -58,9 +61,11 @@ class Tester:
                 self.world = TesterTrafficWorld(None, None, data['world'])
             if self.game_type == "officeworld":
                 self.world = TesterOfficeWorld(None, None, data['world'])
+            if self.game_type == "taxiworld":
+                self.world = TesterTaxiWorld(None, None, data['world']) # TODO is that correct?
 
             self.results = data['results']
-            self.steps   = data['steps']            
+            self.steps   = data['steps']
             # obs: json transform the interger keys from 'results' into strings
             # so I'm changing the 'steps' to strings
             for i in range(len(self.steps)):
@@ -68,9 +73,14 @@ class Tester:
 
     def update_hypothesis_machine(self):
         self.hypothesis_machine = RewardMachine(self.hypothesis_machine_file)
+        # print("\x1B[1;32;44m update: %s \x1B[m" % self.hypothesis_machine_file)
+        with open(self.hypothesis_machine_file) as f:
+            print("\x1B[1;35m{}\x1B[m".format("Update Reward Machine:"))
+            print("\x1B[35m{}\x1B[m".format(f.read()))
 
     def update_hypothesis_machine_file(self,hmfile):
         self.hypothesis_machine_file = hmfile
+        # print("\x1B[1;32;44m update_file: %s \x1B[m" % self.hypothesis_machine_file)
 
     def get_hypothesis_machine(self):
         return self.hypothesis_machine
@@ -93,7 +103,7 @@ class Tester:
 
     def get_world_dictionary(self):
         return self.world.get_dictionary()
-    
+
     def get_task_specifications(self):
         # Returns the list with the task specifications (reward machine + env params)
         return self.world.get_task_specifications()
@@ -128,7 +138,7 @@ class Tester:
                 id_step = [i for i in range(len(self.steps)) if self.steps[i] == step][0] - 1
                 reward = 0 if id_step < 0 else self.results[task_str][self.steps[id_step]][-1]
                 #print("Skiped reward is", reward)
-            self.results[task_str][step].append(reward) 
+            self.results[task_str][step].append(reward)
             aux.append(reward)
         if self.game_type=="officeworld" or self.game_type=="craftworld" or self.game_type=="trafficworld":
             print("Testing: %0.1f"%(time.time() - t_init), "seconds\tTotal: %d"%sum([(r if r > 0 else self.testing_params.num_steps) for r in reward2steps(aux)]))
@@ -137,14 +147,14 @@ class Tester:
 
     def show_results(self):
         average_reward = {}
-        
+
         tasks = self.get_task_specifications()
 
         # Showing perfomance per task
         for t in tasks:
             t_str = str(t)
             print("\n" + t_str + " --------------------")
-            print("steps\tP25\t\tP50\t\tP75")            
+            print("steps\tP25\t\tP50\t\tP75")
             for s in self.steps:
                 normalized_rewards = [r/self.get_optimal(t) for r in self.results[t_str][s]]
                 a = np.array(normalized_rewards)
@@ -205,7 +215,7 @@ class Tester:
         ret = {}
         for t in self.get_task_specifications():
             t_str = str(t)
-            ret[t_str] = max([max(self.results[t_str][s]) for s in self.steps]) 
+            ret[t_str] = max([max(self.results[t_str][s]) for s in self.steps])
         return ret
 
     def get_result_summary(self):
@@ -248,6 +258,5 @@ class Tester:
                 normalized_task_rewards = task_reward[task_rm][s] / float(task_reward_count[task_rm])
                 ret_task[task_rm].append([s, normalized_task_rewards])
         ret_task["all"] = ret
-                
-        return ret_task
 
+        return ret_task

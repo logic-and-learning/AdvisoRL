@@ -1,0 +1,35 @@
+3 # initial state (passenger at location A)
+
+(3,2,'e',ConstantRewardFunction(0))
+(3,1,'a',ConstantRewardFunction(0))
+(2,1,'a',ConstantRewardFunction(0))
+(1,0,'!a&!e',ConstantRewardFunction(0))
+(0,1,'a',ConstantRewardFunction(0))
+(1,2,'e',ConstantRewardFunction(0)) # set reward to 1 if destination
+(2,3,'!e&!a',ConstantRewardFunction(0))
+
+(6,5,'f',ConstantRewardFunction(0))
+(6,4,'b',ConstantRewardFunction(0))
+(5,4,'b',ConstantRewardFunction(0))
+(4,0,'!b&!f',ConstantRewardFunction(0))
+(0,4,'b',ConstantRewardFunction(0))
+(4,5,'f',ConstantRewardFunction(0)) # set reward to 1 if destination
+(5,6,'!f&!b',ConstantRewardFunction(0))
+
+(9,8,'g',ConstantRewardFunction(0))
+(9,7,'c',ConstantRewardFunction(0))
+(8,7,'c',ConstantRewardFunction(0))
+(7,0,'!c&!g',ConstantRewardFunction(0))
+(0,7,'c',ConstantRewardFunction(0))
+(7,13,'g',ConstantRewardFunction(1)) # set reward to 1 if destination
+(8,9,'!g&!c',ConstantRewardFunction(0))
+
+(12,11,'h',ConstantRewardFunction(0))
+(12,10,'d',ConstantRewardFunction(0))
+(11,10,'d',ConstantRewardFunction(0))
+(10,0,'!d&!h',ConstantRewardFunction(0))
+(0,10,'d',ConstantRewardFunction(0))
+(10,11,'h',ConstantRewardFunction(0)) # set reward to 1 if destination
+(11,12,'!h&!d',ConstantRewardFunction(0))
+
+(13,13,'True',ConstantRewardFunction(0)) # final state
