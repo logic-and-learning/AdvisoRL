@@ -1,0 +1,51 @@
+
+NOTES
+=====
+
+
+
+TODO (priority ordered)
+====
+
+
+
+- set_alphatbet_size
+
+- finish mVCA angluin-like
+
+- create debian packages
+
+- RPNI: check for correctness
+
+- DeLeTe2: check for correctness
+
+- network code: check network/deserialization code for bugs
+
+- documentation
+
+- IDEA: abstract knowledgebase?
+
+- IDEA: change knowledgebase-query interface to represent normalizer and remove them
+  from algorithm and into knowledgebase?
+
+- knowledgebase: rewrite / check efficiency of equivalence relation
+
+- RPNI: check efficiency
+
+- DeLeTe2: check efficiency
+
+- angluin: check undo and increase_alphabet_size()
+
+- NL*: add normalizer and undo
+
+- NL*: check increase_alphabet_size()
+
+- Bierman: efficient implementation (using DDB instead of MiniSat)
+
+- BL*: implement
+
+- L*,L*col,NL*: use knowledgebase pointers instead of list<int> words.
+
+- learning of mealy-machine? (some L* variant?)
+
+

@@ -1,0 +1,5 @@
+"trafficworld"
+"../experiments/traffic/maps/map_0.map" # map
+["../experiments/traffic/reward_machines/t%d.txt"%i for i in [1]]  # tasks
+[14] # optimal policies
+False      # consider_night

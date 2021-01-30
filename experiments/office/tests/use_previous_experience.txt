@@ -1,0 +1,3 @@
+"officeworld"
+["../experiments/use_past/t%d.txt"%i for i in [1,2]]  # tasks
+[15,15] # optimal policies

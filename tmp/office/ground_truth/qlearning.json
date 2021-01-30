@@ -1,0 +1,1 @@
+{"game_type": "officeworld", "steps": [], "results": {"../experiments/office/reward_machines/t2.txt": {}}, "world": {"experiment": "../experiments/office/tests/ground_truth.txt", "tasks": ["../experiments/office/reward_machines/t2.txt"], "optimal": {"../experiments/office/reward_machines/t2.txt": 0.2824295364810001}}}

@@ -1,0 +1,17 @@
+
+NOTE: to all MiniSat files, a different license applies. Please see the
+file LICENSE-MiniSat. The files in question are:
+
+include/libalf/minisat_Global.h
+include/libalf/minisat_Heap.h
+include/libalf/minisat_Solver.h
+include/libalf/minisat_SolverTypes.h
+include/libalf/minisat_Sort.h
+include/libalf/minisat_VarOrder.h
+src/minisat_solver.cpp
+
+
+ALL OTHER FILES ARE LICENSED UNDER THE FOLLOWING LICENSE:
+
+LGPL, as described in lgpl.txt
+

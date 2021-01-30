@@ -1,0 +1,2 @@
+0 # initial state
+(0,0,'!n',ConstantRewardFunction(0))

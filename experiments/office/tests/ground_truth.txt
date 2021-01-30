@@ -1,0 +1,3 @@
+"officeworld"
+["../experiments/office/reward_machines/t%d.txt"%i for i in [1]]  # tasks
+[13] # optimal policies
