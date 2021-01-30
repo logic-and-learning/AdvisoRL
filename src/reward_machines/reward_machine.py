@@ -65,8 +65,8 @@ class RewardMachine:
 
     def is_this_machine_equivalent(self, u1, rm2, u2):
         """
-        return True iff 
-            this reward machine initialized at u1 is equivalent 
+        return True iff
+            this reward machine initialized at u1 is equivalent
             to the reward machine rm2 initialized at u2
         """
         return are_these_machines_equivalent(self, u1, rm2, u2)
@@ -97,6 +97,7 @@ class RewardMachine:
         self.u0 = eval(lines[0])
         # adding transitions
         for e in lines[1:]:
+            if not e: continue
             self._add_transition(*eval(e))
         # adding terminal states
         for u1 in self.U:
@@ -126,7 +127,7 @@ class RewardMachine:
 
     def _is_terminal(self, u1):
         # A node is labelled as terminal if any policy is optimal for that node
-        # Here, we consider 2 simple cases: 
+        # Here, we consider 2 simple cases:
         #     - No transition is defined for u1
         #     - There is only one 'True' self-loop and the reward from "u1" to "u1" is constant
         # if len(self.delta_u[u1]) == 0:
@@ -139,7 +140,7 @@ class RewardMachine:
                 if self.delta_r[u0][u1].c == 1:
                     return True
         return False
-            
+
     def _add_state(self, u_list):
         for u in u_list:
             if u not in self.U:

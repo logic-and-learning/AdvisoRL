@@ -1,10 +1,14 @@
 import numpy as np
 import random, time
+import itertools
 from automata_learning_utils import al_utils
+# import automata_learning_utils.al_utils
 from worlds.game import *
 from reward_machines.reward_machine import RewardMachine
 from automata_learning.Traces import Traces
 from tester.tester import Tester
+from tester.livetester import LiveTester
+from tester.timer import Timer
 import shutil
 import os
 import subprocess
@@ -13,7 +17,7 @@ import time
 
 def run_aqrm_task(epsilon, env, learned_rm_file, tester_true, tester_learned, curriculum, show_print, is_rm_learned, currentstep, previous_testing_reward, q):
     """
-    This code runs one training episode. 
+    This code runs one training episode.
         - rm_file: It is the path towards the RM machine to solve on this episode
         - environment_rm: an environment reward machine, the "true" one, underlying the execution
     """
@@ -60,7 +64,9 @@ def run_aqrm_task(epsilon, env, learned_rm_file, tester_true, tester_learned, cu
         s = np.where(s1_features==1)[0][0]
 
         # Choosing an action to perform
-        if random.random() < 0.15:
+        # if random.random() < epsilon:
+        # if random.random() < 0.15:
+        if random.random() < 0.30:
             a = random.choice(actions)
         else:
             if max(q[s][u1])==0:
@@ -82,6 +88,12 @@ def run_aqrm_task(epsilon, env, learned_rm_file, tester_true, tester_learned, cu
             events = task.get_true_propositions()
         s2, s2_features = task.get_state_and_features()
         s_new = np.where(s2_features==1)[0][0]
+        ###############################################
+        # print(">>>", a)
+        # # print(task.game)
+        # task.game.show()
+        # # time.sleep(0.2)
+        # print(">>>", events)
 
         u2 = rm_learned.get_next_state(u1, events)
         u2_true = rm_true.get_next_state(u1_true,events)
@@ -169,7 +181,6 @@ def run_aqrm_task(epsilon, env, learned_rm_file, tester_true, tester_learned, cu
     else:
         is_test_result = 1
 
-
     if show_print: print("Done! Total reward:", training_reward)
 
     return all_events, training_reward, step_count, is_conflicting, testing_reward, is_test_result, q
@@ -221,7 +232,7 @@ def run_aqrm_test(reward_machines, task_params, rm, rm_true, is_learned, q, lear
         q[s][u1][a] = (1 - alpha) * q[s][u1][a] + alpha * (r + gamma * np.amax(q[s_new][u2]))
 
         r_total += r * learning_params.gamma**t # used in original graphing framework
-        
+
         # Restarting the environment (Game Over)
         if is_learned==0:
             if task.is_env_game_over() or rm_true.is_terminal_state(u2_true):
@@ -257,12 +268,52 @@ def _remove_files_from_folder(relative_path):
         print("There is no directory {}".format(parent_folder))
 
 
-def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times, show_print, show_plots, is_SAT):
+def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times, show_print, show_plots, al_alg_name, sat_alg_name, pysat_hints=None):
+    alg_name = alg_name.lower()
+    al_alg_name = al_alg_name.lower()
+    sat_alg_name = sat_alg_name.lower()
 
-    time_start = time.clock()
-
-    learning_params = tester_learned.learning_params
     testing_params = tester_learned.testing_params
+    learning_params = tester_learned.learning_params
+
+    algorithm_name = alg_name
+    if alg_name=="jirp":
+        algorithm_name += al_alg_name
+        if al_alg_name=="pysat":
+            algorithm_name += sat_alg_name
+        if pysat_hints is not None:
+            algorithm_name += ":" + ":".join(hint.lower() for hint in pysat_hints)
+
+    for character in tester.world.tasks[0]:
+        if str.isdigit(character):
+            task_id = character
+
+    run_name = f"{tester.game_type}{task_id}{algorithm_name}"
+
+    details_filename = f"../plotdata/details_{run_name}.csv"
+    with open(details_filename, 'w') as f:
+        wr = csv.writer(f)
+        wr.writerow(["RUN_PARAMETERS:"])
+        wr.writerow(["world:",         tester.game_type])
+        wr.writerow(["  task:",        task_id])
+        wr.writerow(["algorithm:",     alg_name])
+        wr.writerow(["  enter_loop:",  learning_params.enter_loop])
+        wr.writerow(["  step_unit:",   testing_params.num_steps])
+        wr.writerow(["  total_steps:", curriculum.total_steps])
+        wr.writerow(["  epsilon:",     0.30]) # WARNING: it's hard-coded in `run_aqrm_task()`
+        wr.writerow(["al_algorithm:", al_alg_name.upper()])
+        if "PYSAT" in al_alg_name.upper():
+            wr.writerow(["  sat_algorithm:", sat_alg_name])
+            if pysat_hints is None:
+                wr.writerow(["  hint_at:", "never"])
+            else:
+                wr.writerow(["  hint_at:", "relearn"]) # WARNING: it's hard-coded (see `hm_file`)
+                for hint in pysat_hints:
+                    wr.writerow(["    hint:", hint.lower() if hint else "∅"])
+
+
+
+    # time_start = time.clock()
 
     # just in case, delete all temporary files
     dirname = os.path.abspath(os.path.dirname(__file__))
@@ -273,11 +324,37 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
     plot_dict = dict()
     rewards_plot = list()
 
-
+    # hints
+    hint_dfas = None
+    if pysat_hints is not None:
+        # hint_dfas = [al_utils.gen_sup_hint_dfa(symbols) for symbols in pysat_hints]
+        hint_dfas = list(itertools.chain.from_iterable(
+            al_utils.gen_hints(symbols) for symbols in pysat_hints
+        ))
 
     new_traces = Traces(set(), set())
 
-    for t in range(num_times):
+    if isinstance(num_times, int):
+        num_times = range(num_times)
+    elif isinstance(num_times, tuple):
+        num_times = range(*num_times)
+    for t_i,t in enumerate(num_times):
+
+        LIVETESTER = LiveTester(curriculum,
+            show = (len(num_times)<=1),
+            keep_open = True, # TODO remove
+            # keep_open = show_plots,
+            label = f"{run_name} - iteration {t} ({t_i+1}/{len(num_times)})",
+            filebasename = run_name,
+        ).start()
+        task_timer = Timer()
+        al_data = {
+            "step": [],
+            "pos": [],
+            "neg": [],
+            "time": [],
+        }
+
         # Setting the random seed to 't'
 
         random.seed(t)
@@ -288,15 +365,6 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
         # Reseting default values
         curriculum.restart()
 
-        hm_file = './automata_learning/hypothesis_machine.txt'
-        shutil.copy(hm_file,'./automata_learning_utils/data/rm.txt') #######
-
-        # Creating policy bank
-        task_aux = Game(tester.get_task_params(curriculum.get_current_task()))
-        num_features = len(task_aux.get_features())
-        num_actions  = len(task_aux.get_actions())
-        q = np.zeros([1681,15,4])
-
         num_episodes = 0
         total = 0
         learned = 0
@@ -306,9 +374,35 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
         update_rm = 0
         refreshed = 0
         testing_step = 0
+        LIVETESTER.add_bool(step, 'learned', learned)
+
+        # computing rm
+        LIVETESTER.add_event(step, 'rm_update', force_update=show_plots)
+        hm_file        = './automata_learning_utils/data/rm0.txt'
+        hm_file_update = './automata_learning_utils/data/rm.txt'
+        shutil.copy('./automata_learning/hypothesis_machine.txt', hm_file)
+        # if hint_dfas is not None:
+        #     print("Initial reward machine...")
+        #     rm0 = al_utils.gen_dfa_from_hints(sup_hints=hint_dfas, show_plots=show_plots) # hint since BEGINNING
+        #     # rm0 = al_utils.gen_partial_hint_dfa(pysat_hints[0], show_plots=show_plots) # begin with PARTIAL hint
+        #     # rm0 = al_utils.gen_empty_hint_dfa(pysat_hints[0], show_plots=show_plots) # INITEMPTY
+        #     rm0.export_as_reward_automaton(hm_file)
+        #     Traces.rm_trace_to_symbol(hm_file)
+        #     Traces.fix_rmfiles(hm_file)
+        shutil.copy(hm_file, hm_file_update)
+
+
+        # Creating policy bank
+        task_aux = Game(tester.get_task_params(curriculum.get_current_task()))
+        num_features = len(task_aux.get_features())
+        num_actions  = len(task_aux.get_actions())
+        # q = np.zeros([1681,15,4])
+        q = np.zeros([1681,15,num_actions])
 
         hypothesis_machine = tester.get_hypothesis_machine()
+        tester_learned.update_hypothesis_machine_file(hm_file)
         tester_learned.update_hypothesis_machine()
+        # LIVETESTER.add_event(step, 'rm_update') # already added
 
         # Task loop
         automata_history = []
@@ -317,6 +411,8 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
         steps = list()
         testing_reward = 0 #initializes value
         all_traces = Traces(set(),set())
+        LIVETESTER.add_traces_size(step, all_traces, 'all_traces')
+        LIVETESTER.add_traces_size(step, new_traces, 'new_traces')
         epsilon = 0.3
         tt=t+1
         print("run index:", +tt)
@@ -328,16 +424,17 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
             rm_file_truth = '../experiments/craft/reward_machines/t1.txt'
 
             # Running 'task_rm_id' for one episode
-            hm_file_update =  './automata_learning_utils/data/rm.txt'
 
             if learned==0:
                 rm_file_learned = hm_file
                 if update_rm:
                     update_rm = 0
                     refreshed = 1
-                    tester_learned.update_hypothesis_machine_file('./automata_learning/hypothesis_machine.txt')
+                    tester_learned.update_hypothesis_machine_file(hm_file)
                     tester_learned.update_hypothesis_machine()
+                    LIVETESTER.add_event(step, 'rm_refresh')
                     all_traces = Traces(set(),set())
+                    LIVETESTER.add_traces_size(step, all_traces, 'all_traces')
                     num_conflicting_since_learn = 0
                     q = np.zeros([1681,15,4])
                     enter_loop = 1
@@ -353,13 +450,16 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
                 else:
                     update_rm = 0
                     refreshed = 1
-                    tester_learned.update_hypothesis_machine_file('./automata_learning/hypothesis_machine.txt')
+                    tester_learned.update_hypothesis_machine_file(hm_file)
                     tester_learned.update_hypothesis_machine()
+                    LIVETESTER.add_event(step, 'rm_refresh')
                     all_traces = Traces(set(), set())
+                    LIVETESTER.add_traces_size(step, all_traces, 'all_traces')
                     num_conflicting_since_learn = 0
                     q = np.zeros([1681, 15, 4])
                     enter_loop = 1
                     learned = 0
+                    LIVETESTER.add_bool(step, 'learned', learned)
 
                 update_rm = 0
 
@@ -369,9 +469,15 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
 
             epsilon = epsilon*0.99
 
-            all_events, found_reward, stepcount, conflicting, testing_reward, is_test, q = run_aqrm_task(epsilon, rm_file_truth, rm_file_learned, tester, tester_learned, curriculum, show_print, learned, step, testing_reward, q)
-
-
+            task_timer.resume()
+            all_events, found_reward, stepcount, conflicting, testing_reward, is_test, q = run_aqrm_task(
+                epsilon, rm_file_truth, rm_file_learned, tester, tester_learned, curriculum, show_print, learned, step, testing_reward, q
+            )
+            task_timer.stop()
+            LIVETESTER.add_bool(step, 'conflicting', conflicting)
+            LIVETESTER.add_bool(step, 'is_positive', found_reward>0)
+            LIVETESTER.add_bool(step, 'is_test', is_test)
+            # print(",".join(all_events), "\n") #################################################
 
 
             #set up traces; we remove anything foreign to our ground truth formula
@@ -391,11 +497,12 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
                    all_events.remove('g')
                 while 'h' in all_events:
                    all_events.remove('h')
- 
+
             while '' in all_events:
                 all_events.remove('')
             if (conflicting==1 or refreshed==1):
                 all_traces.add_trace(all_events, found_reward, learned)
+                LIVETESTER.add_traces_size(step, all_traces, 'all_traces')
 
             if (num_episodes%100==0):
                 print("run index:", +tt)
@@ -414,10 +521,9 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
 
             if is_test:
                 testing_step += testing_params.test_freq
-                if testing_step in plot_dict:
-                    plot_dict[testing_step].append(testing_reward)
-                else:
-                    plot_dict[testing_step] = [testing_reward]
+                plot_dict.setdefault(testing_step, [])
+                plot_dict[testing_step].append(testing_reward)
+                LIVETESTER.add_reward(testing_step, testing_reward)
 
 
             if learned==1:
@@ -427,32 +533,45 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
 
                 if conflicting==1:
                     new_traces.add_trace(all_events, found_reward, learned)
+                    LIVETESTER.add_traces_size(step, new_traces, 'new_traces')
 
 
 
+            # if enter_loop:
+            #     print("\x1B[1;31;44m enter loop (%d positives) \x1B[m" % len(all_traces.positive))
+            if (len(all_traces.positive)<learning_params.enter_loop) and enter_loop:
+                LIVETESTER.add_event(step, 'rm_learn_failed', force_update=show_plots)
             if (len(all_traces.positive)>=learning_params.enter_loop) and enter_loop:
+                LIVETESTER.add_event(step, 'rm_learn', force_update=show_plots)
 
-                positive = set()
-                negative = set()
+                # positive = set()
+                # negative = set()
+                #
+                # if learned==0:
+                #     if len(all_traces.positive)>0:
+                #         for i in list(all_traces.positive):
+                #             if all_traces.symbol_to_trace(i) not in positive:
+                #                 positive.add(all_traces.symbol_to_trace(i))
+                #     if len(all_traces.negative)>0:
+                #         for i in list(all_traces.negative):
+                #             if all_traces.symbol_to_trace(i) not in negative:
+                #                 negative.add(all_traces.symbol_to_trace(i))
+                # else:
+                #     if len(new_traces.positive)>0:
+                #         for i in list(new_traces.positive):
+                #             if new_traces.symbol_to_trace(i) not in positive:
+                #                 positive.add(new_traces.symbol_to_trace(i))
+                #     if len(new_traces.negative)>0 and len(all_traces.negative):
+                #         for i in list(new_traces.negative):
+                #             if new_traces.symbol_to_trace(i) not in negative:
+                #                 negative.add(new_traces.symbol_to_trace(i))
+                """equivalent:"""
+                traces = all_traces if not learned else new_traces
+                positive = set(Traces.symbol_to_trace(i) for i in traces.positive)
+                negative = set(Traces.symbol_to_trace(i) for i in traces.negative)
 
-                if learned==0:
-                    if len(all_traces.positive)>0:
-                         for i in list(all_traces.positive):
-                             if all_traces.symbol_to_trace(i) not in positive:
-                                 positive.add(all_traces.symbol_to_trace(i))
-                    if len(all_traces.negative)>0:
-                        for i in list(all_traces.negative):
-                            if all_traces.symbol_to_trace(i) not in negative:
-                                negative.add(all_traces.symbol_to_trace(i))
-                else:
-                     if len(new_traces.positive)>0:
-                        for i in list(new_traces.positive):
-                             if new_traces.symbol_to_trace(i) not in positive:
-                                 positive.add(new_traces.symbol_to_trace(i))
-                     if len(new_traces.negative)>0 and len(all_traces.negative):
-                         for i in list(new_traces.negative):
-                             if new_traces.symbol_to_trace(i) not in negative:
-                                 negative.add(new_traces.symbol_to_trace(i))
+                # print("PPP", positive) ####################################""
+                # print("NNN", negative)
 
 
                 positive_new = set() ## to get rid of redundant prefixes
@@ -461,7 +580,7 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
                 if not learned:
                     for ptrace in positive:
                         new_trace = list()
-                        previous_prefix = 100 #arbitrary
+                        previous_prefix = None #arbitrary
                         for prefix in ptrace:
                             if prefix != previous_prefix:
                                 new_trace.append(prefix)
@@ -470,7 +589,7 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
 
                     for ntrace in negative:
                         new_trace = list()
-                        previous_prefix = 100 #arbitrary
+                        previous_prefix = None #arbitrary
                         for prefix in ntrace:
                             if prefix != previous_prefix:
                                 new_trace.append(prefix)
@@ -510,16 +629,32 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
                 traces_numerical = Traces(positive_new, negative_new)
                 traces_file = './automata_learning_utils/data/data.txt'
                 traces_numerical.export_traces(traces_file)
+                LIVETESTER.add_traces_size(step, traces_numerical, 'traces_numerical')
 
                 if learned == 1:
                     shutil.copy('./automata_learning_utils/data/rm.txt', '../experiments/use_past/t2.txt')
 
-                automaton_visualization_filename = al_utils.learn_automaton(traces_file, show_plots, is_SAT)
+                al_utils.al_timer.reset()
+                automaton_visualization_filename = al_utils.learn_automaton(traces_file, show_plots,
+                    automaton_learning_algorithm=al_alg_name,
+                    pysat_algorithm=sat_alg_name,
+                    sup_hint_dfas=hint_dfas,
+                    output_reward_machine_filename=hm_file_update,
+                )
+                al_data["step"].append(step)
+                al_data["pos"].append(len(traces_numerical.positive))
+                al_data["neg"].append(len(traces_numerical.negative))
+                al_data["time"].append(al_utils.al_timer.elapsed())
+                # if al_utils.al_timer.elapsed() > 10: #TODO REMOVE
+                #     shutil.copy(traces_file, '../plotdata/data{:d}{:d}_{}_{:02d}{:02d}.txt'.format(
+                #         2, int(task_id),
+                #         algorithm_name[4:].upper(),
+                #         t, len(al_data["time"])-1,
+                #     ))
 
                 # t2 is previous, t1 is new
-                hm_file_update = './automata_learning_utils/data/rm.txt'
-                all_traces.rm_trace_to_symbol(hm_file_update)
-                all_traces.fix_rmfiles(hm_file_update)
+                Traces.rm_trace_to_symbol(hm_file_update)
+                Traces.fix_rmfiles(hm_file_update)
 
                 if learned == 0:
                     shutil.copy('./automata_learning_utils/data/rm.txt',
@@ -527,6 +662,7 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
 
                 tester_learned.update_hypothesis_machine_file(hm_file_update) ## NOTE WHICH TESTER IS USED
                 tester_learned.update_hypothesis_machine()
+                # LIVETESTER.add_event(step, 'rm_learn') # already added
 
 
                 print("learning")
@@ -538,8 +674,12 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
                     current_and_previous_rms = '../experiments/office/tests/use_previous_experience.txt'
                 elif tester.game_type == 'craftworld':
                     current_and_previous_rms = '../experiments/craft/tests/use_previous_experience.txt'
-                else:
+                elif tester.game_type == 'trafficworld':
                     current_and_previous_rms = '../experiments/traffic/tests/use_previous_experience.txt'
+                elif tester.game_type == 'taxiworld':
+                    current_and_previous_rms = '../experiments/taxi/tests/use_previous_experience.txt'
+                else:
+                    raise NotImplementedError(tester.game_type)
 
 
                 tester_current = Tester(learning_params,testing_params,current_and_previous_rms)
@@ -548,51 +688,78 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
 
 
                 learned = 1
+                LIVETESTER.add_bool(step, 'learned', learned)
                 enter_loop = 0
                 num_conflicting_since_learn = 0
                 update_rm = 1
 
             if num_episodes%learning_params.relearn_period==0:
                 new_traces = Traces(set(), set())
+                LIVETESTER.add_traces_size(step, new_traces, 'new_traces')
 
-            if (learned==1 and num_episodes==1000):
-
-                tester_learned.update_hypothesis_machine()
-
-
-
-                shutil.copy(hm_file_update, '../experiments/use_past/t2.txt')
-                if tester.game_type == 'officeworld':
-                    current_and_previous_rms = '../experiments/office/tests/use_previous_experience.txt'
-                elif tester.game_type == 'craftworld':
-                    current_and_previous_rms = '../experiments/craft/tests/use_previous_experience.txt'
-                else:
-                    current_and_previous_rms = '../experiments/traffic/tests/use_previous_experience.txt'
-
-
-                tester_current = Tester(learning_params,testing_params,current_and_previous_rms)
-
-
-                q_old = np.copy(q)
-                for ui in range(len(tester_current.reward_machines[0].get_states())):
-                    if not tester_current.reward_machines[0]._is_terminal(ui):
-                        is_transferred = 0
-                        for uj in range(len(tester_current.reward_machines[1].get_states())):
-                            if not tester_current.reward_machines[1]._is_terminal(uj):
-                                if tester_current.reward_machines[0].is_this_machine_equivalent(ui,tester_current.reward_machines[1],uj):
-                                    for s in range(len(q)):
-                                        if sum(q_old[s][uj])>0:
-                                            q_old
-                                        q[s][ui] = np.copy(q_old[s][uj])
-                                    is_transferred = 1
-                                else:
-                                    if not is_transferred:
-                                        for s in range(len(q)):
-                                            q[s][ui] = 0
+            # if (learned==1 and num_episodes==1000):
+            #
+            #     tester_learned.update_hypothesis_machine()
+            #     LIVETESTER.add_event(step, 'rm_update')
+            #
+            #
+            #
+            #     shutil.copy(hm_file_update, '../experiments/use_past/t2.txt')
+            #     if tester.game_type == 'officeworld':
+            #         current_and_previous_rms = '../experiments/office/tests/use_previous_experience.txt'
+            #     elif tester.game_type == 'craftworld':
+            #         current_and_previous_rms = '../experiments/craft/tests/use_previous_experience.txt'
+            #     else:
+            #         current_and_previous_rms = '../experiments/traffic/tests/use_previous_experience.txt'
+            #
+            #
+            #     tester_current = Tester(learning_params,testing_params,current_and_previous_rms)
+            #
+            #
+            #     q_old = np.copy(q)
+            #     for ui in range(len(tester_current.reward_machines[0].get_states())):
+            #         if not tester_current.reward_machines[0]._is_terminal(ui):
+            #             is_transferred = 0
+            #             for uj in range(len(tester_current.reward_machines[1].get_states())):
+            #                 if not tester_current.reward_machines[1]._is_terminal(uj):
+            #                     if tester_current.reward_machines[0].is_this_machine_equivalent(ui,tester_current.reward_machines[1],uj):
+            #                         for s in range(len(q)):
+            #                             if sum(q_old[s][uj])>0:
+            #                                 q_old
+            #                             q[s][ui] = np.copy(q_old[s][uj])
+            #                         is_transferred = 1
+            #                     else:
+            #                         if not is_transferred:
+            #                             for s in range(len(q)):
+            #                                 q[s][ui] = 0
+            #     # for ui in range(len(tester_current.reward_machines[0].get_states())):
+            #     #     for s in range(len(q)):
+            #     #         q[s][ui] = 0
 
 
         # Backing up the results
         print('Finished iteration ',t)
+
+        reward_step = None # first step at which G(reward=1)
+        for step,rwds in plot_dict.items():
+            reward = rwds[-1]
+            if not reward:
+                reward_step = None
+            elif reward_step is None:
+                reward_step = step
+
+        with open(details_filename, 'a') as f:
+            wr = csv.writer(f)
+            wr.writerow(["ITERATION_DETAIL:", t])
+            wr.writerow(["task_time:", task_timer.elapsed()])
+            wr.writerow(["al_step:", *al_data["step"]])
+            wr.writerow(["al_pos:",  *al_data["pos"]])
+            wr.writerow(["al_neg:",  *al_data["neg"]])
+            wr.writerow(["al_time:", *al_data["time"]])
+            wr.writerow(["total_time:", sum((task_timer.elapsed(),*al_data["time"]))])
+            wr.writerow(["reward_step:", reward_step])
+
+        LIVETESTER.close()
 
     # Showing results
 
@@ -632,33 +799,19 @@ def run_aqrm_experiments(alg_name, tester, tester_learned, curriculum, num_times
 
 
 
-    tester.plot_performance(steps_plot,prc_25,prc_50,prc_75)
-    tester.plot_this(steps_plot,rewards_plot)
+    # tester.plot_performance(steps_plot,prc_25,prc_50,prc_75) #TODO: uncomment
+    # tester.plot_this(steps_plot,rewards_plot) #TODO: uncomment
 
-    if alg_name=="jirp":
-        if is_SAT==1:
-            algorithm_name = "jirpsat"
-        else:
-            algorithm_name = "jirprpni"
-    else:
-        algorithm_name = alg_name
+    output_filename = f"../plotdata/{run_name}.csv"
 
-    for character in tester.world.tasks[0]:
-        if str.isdigit(character):
-            task_id = character
-            filename = ("../plotdata/") + (tester.game_type) + ("") + (task_id) + ("") + (
-                algorithm_name) + ".csv"
-
-    with open(filename, 'w') as f:
+    with open(output_filename, 'w') as f:
         wr = csv.writer(f)
         wr.writerows(list(plot_dict.values()))
 
 
-    avg_filename = ("../plotdata/") + ("avgreward_") + (tester.game_type) + ("") + (task_id) + ("") + (
-                algorithm_name) + ".txt"
+    avg_filename = f"../plotdata/avgreward_{run_name}.txt"
 
     with open(avg_filename, 'w') as f:
         f.write("%s\n" % str(sum(rewards_plot) / len(rewards_plot)))
         for item in rewards_plot:
             f.write("%s\n" % item)
-

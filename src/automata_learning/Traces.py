@@ -1,4 +1,5 @@
 import os
+import functools
 
 class Traces:
     def __init__(self, positive = set(), negative = set()):
@@ -27,30 +28,38 @@ class Traces:
                 all_prefixes.add(trace[:i])
         return all_prefixes
 
-    def symbol_to_trace(self,symbols):
-        letters = ['a','b','c','d','e','f','g', 'h', 'n']
-        numbers = [int(i) for i in range(0,9)]
-        dictionary = dict(zip(letters, numbers))
-        traces = list()
-        for symbol in symbols:
-            traces.append(dictionary.get(symbol))
-        return tuple(traces)
+    letters = ['a','b','c','d','e','f','g', 'h', 'n']
+    numbers = [int(i) for i in range(0,9)]
 
+    @classmethod
+    @functools.lru_cache()
+    def get_letter2number_dict(cls):
+        return dict(zip(cls.letters, cls.numbers))
 
-    def trace_to_symbol(self,traces):
-        letters = ['a','b','c','d','e','f','g', 'h', 'n']
-        numbers = [int(i) for i in range(0,9)]
-        dictionary = dict(zip(numbers, letters))
-        symbols = list()
-        for trace in traces:
-            symbols.append(dictionary.get(trace))
-        return tuple(traces)
+    @classmethod
+    @functools.lru_cache()
+    def get_number2letter_dict(cls):
+        return dict(zip(cls.numbers, cls.letters))
 
-    def rm_trace_to_symbol(self,rm_file):
+    @classmethod
+    def letter2number(cls, letter):
+        return cls.get_letter2number_dict().get(letter, None)
+
+    @classmethod
+    def number2letter(cls, number):
+        return cls.get_number2letter_dict().get(number, None)
+
+    @classmethod
+    def symbol_to_trace(cls, symbols):
+        return tuple(cls.letter2number(letter) for letter in symbols)
+
+    @classmethod
+    def trace_to_symbol(cls, trace):
+        return tuple(cls.number2letter(number) for number in trace)
+
+    @classmethod
+    def rm_trace_to_symbol(cls, rm_file):
         file = rm_file
-        letters = ['a','b','c','d','e','f','g', 'h', 'n']
-        numbers = [int(i) for i in range(0,9)]
-        dictionary = dict(zip(numbers, letters))
 
         with open(file) as f:
             content = f.readlines()
@@ -73,7 +82,7 @@ class Traces:
                     elif (check==1):
                         number += character
                     count = count+1
-            symbol = dictionary.get(int(number))
+            symbol = cls.number2letter(int(number))
             #symbol = symbol + '&!n'
             line = list(line) #necessary for use of pop,insert
             if end==begin+1:
@@ -89,7 +98,8 @@ class Traces:
                 for item in line:
                     f.write(str(item))
 
-    def fix_rmfiles(self,rmfile):
+    @staticmethod
+    def fix_rmfiles(rmfile):
         file = rmfile
         with open(file) as f:
             content = f.readlines()

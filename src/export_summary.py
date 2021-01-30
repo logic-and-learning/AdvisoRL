@@ -28,7 +28,7 @@ def export_results_traffic_world(task_id, algorithm):
     step_unit = get_params_traffic_world('../experiments/traffic/tests/ground_truth.txt')[0].num_steps
     max_step = get_params_traffic_world('../experiments/traffic/tests/ground_truth.txt')[3].total_steps
 
-    steps = np.linspace(0, max_step, (max_step / step_unit) + 1, endpoint=True)
+    steps = np.linspace(0, max_step, round(max_step / step_unit) + 1, endpoint=True)
 
     if task_id>0:
         p25 = [0]
@@ -508,7 +508,7 @@ def export_results_office_world(task_id, algorithm):
     step_unit = get_params_office_world('../experiments/office/tests/ground_truth.txt')[0].num_steps
     max_step = get_params_office_world('../experiments/office/tests/ground_truth.txt')[3].total_steps
 
-    steps = np.linspace(0, max_step, (max_step / step_unit) + 1, endpoint=True)
+    steps = np.linspace(0, max_step, round(max_step / step_unit) + 1, endpoint=True)
 
     if task_id>0:
         p25 = [0]
@@ -984,7 +984,7 @@ def export_results_craft_world(task_id, algorithm):
     step_unit = get_params_craft_world('../experiments/craft/tests/ground_truth.txt')[0].num_steps
     max_step = get_params_craft_world('../experiments/craft/tests/ground_truth.txt')[3].total_steps
 
-    steps = np.linspace(0, max_step, (max_step / step_unit) + 1, endpoint=True)
+    steps = np.linspace(0, max_step, round(max_step / step_unit) + 1, endpoint=True)
 
     if task_id>0:
         p25 = [0]
