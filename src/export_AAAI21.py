@@ -9,8 +9,8 @@ def warning(text): return termcolor.colored(text, color='red', attrs=["bold"])
 from export_summary2 import *
 from export_details import *
 
-data_location="/home/jraph/Documents/Studies/internship-2020-austin/REINFORCEMENT_LEARNING"
-latex_location="/home/jraph/Documents/Studies/internship-2020-austin/rl-with-advice/AAAI2021"
+data_location="../plotdata"
+latex_location=".."
 
 def export_case_1_perfs(ext="png"):
     world, task = "office", 7
